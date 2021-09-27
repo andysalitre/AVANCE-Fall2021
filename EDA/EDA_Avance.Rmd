@@ -1,0 +1,131 @@
+---
+title: "Exploratory Data Analysis, AVANCE"
+author: "Elliot Riesman-Tremonte"
+date: "9/27/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Importing Datasets
+
+```{r}
+library(readr)
+intake_SA <- read_csv("Downloads/SA_intake_20-21.csv")
+intake_ATX <- read_csv("Downloads/Austin_intake_20-21.csv")
+intake_HTX <- read_csv("Downloads/Houston_intake_20-21.csv")
+intake_Hid <- read_csv("Downloads/Hidalgo_intake_20-21.csv")
+intake_Son <- read_csv("Downloads/Sonoma_intake_20-21.csv")
+intake_DTX <- read_csv("Downloads/Dallas_intake_20-21.csv")
+
+
+
+drops_SA <- read_csv("Downloads/SA_drops_20-21.csv")
+drops_Hid <- read_csv("Downloads/Hidalgo_drops_20-21.csv")
+drops_Son <- read_csv("Downloads/Sonoma_drops_20-21.csv")
+drops_DTX <- read_csv("Downloads/Dallas_drops_20-21.csv")
+drops_HTX <- read_csv("Downloads/Houston_drops_20-21.csv")
+drops_ATX <- read_csv("Downloads/Austin_drops_20-21.csv")
+
+
+drops_SA$site <- rep("SA", nrow(drops_SA))
+drops_Hid$site <- rep("Hidalgo", nrow(drops_Hid))
+drops_Son$site <- rep("Sonoma", nrow(drops_Son))
+drops_DTX$site <- rep("Dallas", nrow(drops_DTX))
+drops_ATX$site <- rep("Austin", nrow(drops_ATX))
+drops_HTX$site <- rep("Houston", nrow(drops_HTX))
+```
+
+## Merging and cleaning some of the data
+
+```{r, echo = TRUE}
+
+drops <- rbind(drops_SA, drops_Hid, drops_Son,
+               drops_DTX, drops_ATX, drops_HTX)
+
+## Sometimes the variable names are capitalized and sometimes they are not.
+
+library(stringr)
+library(RColorBrewer)
+
+for (i in 1:nrow(drops)) {
+  drops$`Grad status`[i] <- str_to_title(drops$`Grad status`[i])
+}
+
+## First Exploratory Barplot
+
+barplot(table(drops[, c(2, 3)]), beside = TRUE,
+        legend = TRUE, col = brewer.pal(3, "Set2"),
+        xlab = "Avance Sites", ylab = "Number of Participants",
+        main = "Grad Status for Avance across Sites")
+```
+
+## Marital Status
+
+The impetus for looking at the relationship between marital status and dropout rates are the research papers provided to the team at the start of the project. These may have a real effect.
+
+```{r, echo = TRUE}
+
+## Creating a dataframe with userID, site location and parental marital status.
+
+marital_data <- as.data.frame(rbind(cbind(intake_SA$UID, intake_SA$`What is your marital status?`,
+                                          intake_SA$`Your AVANCE site:¬†`),
+      cbind(intake_Hid$UID, intake_Hid$`What is your marital status?`, intake_Hid$`Your AVANCE site:¬†`),
+      cbind(intake_Son$UID, intake_Son$`What is your marital status?`, intake_Son$`Your AVANCE site:¬†`),
+      cbind(intake_DTX$UID, intake_DTX$`What is your marital status?`, intake_DTX$`Your AVANCE site:¬†`),
+      cbind(intake_ATX$UID, intake_ATX$`What is your marital status?`, intake_ATX$`Your AVANCE site:¬†`),
+      cbind(intake_HTX$UID, intake_HTX$`What is your marital status?`, intake_HTX$`Your AVANCE site:¬†`)))
+colnames(marital_data) <- c("UID", "Marital Status", "Site")
+
+barplot(table(marital_data[, c(2, 3)]), beside = TRUE,
+        legend = TRUE, col = brewer.pal(3, "Set1"),
+        xlab = "Avance Sites", ylab = "Number of Participants",
+        main = "Grad Status for Avance across Sites")
+
+
+## There is clearly an issue here
+## Site from drops dataset does not match Site from Intake
+## Multiple people can be assigned to the same UID.
+
+merged_set <- merge(marital_data, drops, by = "UID")
+head(merged_set[merged_set$Site != merged_set$site,])
+
+
+
+library(reshape2)
+library(scales)
+
+## Here, I am subsetting the data to not include the Starr/Zapata site, due to data incompletion.
+
+mar_table <- table(marital_data[marital_data$Site != "Starr/Zapata", c(2, 3)])
+
+barplot(mar_table, beside = TRUE,
+        legend = TRUE, col = brewer.pal(3, "Set1"),
+        xlab = "Avance Sites", ylab = "Number of Participants",
+        main = "Marital Status")
+
+
+
+library(ggplot2)
+
+marital_data <- marital_data[marital_data$Site != "Starr/Zapata",]
+marital_data <- marital_data[is.na(marital_data$Site) == FALSE,]
+
+## Creating perc_data will allow us to create 100% stacked bar charts in the future, as opposed to frequency bar charts.
+
+library(dplyr)
+
+perc_data <- marital_data %>% 
+  group_by(`Site`, `Marital Status`) %>% 
+  summarise(count = n()) %>% 
+  mutate(perc = count/sum(count))
+
+
+ggplot(data = marital_data, aes(x = `Site`, fill = `Marital Status`), xlab = "Site", ylab = "Number of Participants") + 
+    geom_bar() + ggtitle("Marital Status ")
+
+```
